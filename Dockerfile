@@ -1,6 +1,7 @@
 
 ARG KUBECTL_VERSION=v1.17.3
 ARG KUBECTX_VERSION=0.8.0
+ARG KUBEVAL_VERSION=0.14.0
 ARG STERN_VERSION=1.11.0
 ARG K9S_VERSION=v0.17.3
 ARG HELM_VERSION=3.1.1
@@ -12,6 +13,8 @@ FROM alpine AS builder
 
 # Kubernetes related tools
 FROM lachlanevenson/k8s-kubectl:${KUBECTL_VERSION} AS kubectl
+
+FROM garethr/kubeval:${KUBEVAL_VERSION} AS kubeval
 
 FROM builder AS kubectx
 ARG KUBECTX_VERSION
@@ -57,42 +60,36 @@ RUN wget https://github.com/gruntwork-io/terragrunt/releases/download/${TERRAGRU
 # Final Image
 FROM ubuntu AS final
 
-# get all software version
-ARG KUBECTL_VERSION
-ARG KUBECTX_VERSION
-ARG STERN_VERSION
-ARG K9S_VERSION
-ARG HELM_VERSION
-ARG HELMFILE_VERSION
-ARG TERRAFORM_VERSION
-ARG TERRAGRUNT_VERSION
-
-ENV KUBECTL_VERSION=${KUBECTL_VERSION} \
-    KUBECTX_VERSION=${KUBECTX_VERSION} \
-    STERN_VERSION=${STERN_VERSION} \
-    K9S_VERSION=${K9S_VERSION} \
-    HELM_VERSION=${HELM_VERSION} \
-    HELMFILE_VERSION=${HELMFILE_VERSION} \
-    TERRAFORM_VERSION=${TERRAFORM_VERSION} \
-    TERRAGRUNT_VERSION=${TERRAGRUNT_VERSION} 
-
-## bashrc tools
-WORKDIR /root
-COPY scripts/* /root/
-
 ## useful tools to have
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
         make \
         git \
         jq \
+        wget \
         curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+## bashrc tools
+WORKDIR /root
+COPY scripts/* /root/
+COPY entrypoint.sh /.entrypoint.sh
+RUN chmod +x /.entrypoint.sh
+
+# TODO : get a fixed version in the repo and use a script to update it if needeed, to have a backup
+RUN wget --no-check-certificate https://raw.githubusercontent.com/ahmetb/kubectl-aliases/master/.kubectl_aliases && \
+    echo "\n[ -f ~/.kubectl_aliases ] && . ~/.kubectl_aliases" >> /root/.bashrc
+
+RUN wget --no-check-certificate https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/plugins/kube-ps1/kube-ps1.plugin.zsh -O .kube-ps1.plugin.sh && \
+    echo "\n[ -f ~/.kube-ps1.plugin.sh ] && . ~/.kube-ps1.plugin.sh" >> /root/.bashrc
+
+ENV KUBE_PS1_SYMBOL_ENABLE=false
+
 ## Copy all other tools
 COPY --from=kubectl --chown=0:0 /usr/local/bin/kubectl /usr/local/bin/kubectl
 COPY --from=kubectx --chown=0:0 /usr/local/bin/kubectx /usr/local/bin/kubens /usr/local/bin/
+COPY --from=kubeval --chown=0:0 /kubeval /usr/local/bin/kubeval
 COPY --from=stern --chown=0:0 /usr/local/bin/stern /usr/local/bin/stern
 COPY --from=k9s --chown=0:0 /usr/local/bin/k9s /usr/local/bin/k9s 
 COPY --from=helm --chown=0:0 /usr/bin/helm /usr/local/bin/helm
@@ -100,4 +97,24 @@ COPY --from=helmfile --chown=0:0 /usr/local/bin/helmfile /usr/local/bin/helmfile
 COPY --from=terraform --chown=0:0 /bin/terraform /usr/local/bin/terraform
 COPY --from=terragrunt --chown=0:0 /usr/local/bin/terragrunt /usr/local/bin/terragrunt
 
-ENTRYPOINT ["/root/entrypoint.sh"]
+ENTRYPOINT ["/.entrypoint.sh"]
+
+# for the entrypoint to display all installed software version
+ARG KUBECTL_VERSION 
+ARG KUBECTX_VERSION
+ARG KUBEVAL_VERSION
+ARG STERN_VERSION
+ARG K9S_VERSION
+ARG HELM_VERSION
+ARG HELMFILE_VERSION
+ARG TERRAFORM_VERSION
+ARG TERRAGRUNT_VERSION
+ENV KUBECTL_VERSION=${KUBECTL_VERSION} \
+    KUBECTX_VERSION=${KUBECTX_VERSION} \
+    KUBEVAL_VERSION=${KUBEVAL_VERSION} \
+    STERN_VERSION=${STERN_VERSION} \
+    K9S_VERSION=${K9S_VERSION} \
+    HELM_VERSION=${HELM_VERSION} \
+    HELMFILE_VERSION=${HELMFILE_VERSION} \
+    TERRAFORM_VERSION=${TERRAFORM_VERSION} \
+    TERRAGRUNT_VERSION=${TERRAGRUNT_VERSION} 
