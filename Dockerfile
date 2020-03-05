@@ -67,6 +67,7 @@ RUN apt-get update -y && \
         git \
         jq \
         wget \
+        ca-certificates \
         curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -75,16 +76,10 @@ RUN apt-get update -y && \
 WORKDIR /root
 COPY scripts/* /root/
 COPY entrypoint.sh /.entrypoint.sh
-RUN chmod +x /.entrypoint.sh
+RUN chmod +x /.entrypoint.sh /root/update_scripts.sh
 
 # TODO : get a fixed version in the repo and use a script to update it if needeed, to have a backup
-RUN wget --no-check-certificate https://raw.githubusercontent.com/ahmetb/kubectl-aliases/master/.kubectl_aliases && \
-    echo "\n[ -f ~/.kubectl_aliases ] && . ~/.kubectl_aliases" >> /root/.bashrc
-
-RUN wget --no-check-certificate https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/plugins/kube-ps1/kube-ps1.plugin.zsh -O .kube-ps1.plugin.sh && \
-    echo "\n[ -f ~/.kube-ps1.plugin.sh ] && . ~/.kube-ps1.plugin.sh" >> /root/.bashrc
-
-ENV KUBE_PS1_SYMBOL_ENABLE=false
+RUN DEBUG="true" /root/update_scripts.sh
 
 ## Copy all other tools
 COPY --from=kubectl --chown=0:0 /usr/local/bin/kubectl /usr/local/bin/kubectl

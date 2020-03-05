@@ -50,7 +50,7 @@ if [ -n "$force_color_prompt" ]; then
 fi
 
 if [ "$color_prompt" = yes ]; then
-    PS1='\A ${debian_chroot:+($debian_chroot)}\[\033[01;95m\]docker\[\033[00m\] \[\033[01;34m\]\w\[\033[00m\] $(kube_ps1) \$ '
+    PS1='\[\033[01;90m\]\!.\[\033[00m\]\A$(exit=$?; [ $exit != 0 ] && echo "\[\033[01;31m\] \\$?=$exit" )\[\033[00m\] ${debian_chroot:+($debian_chroot)}\[\033[01;95m\]docker\[\033[00m\] \[\033[01;34m\]\w\[\033[00m\]$(kube_ps1)$(__git_ps1 "[%s]" ) \$ '
 else
     PS1='\A ${debian_chroot:+($debian_chroot)}docker \w \$ '
 fi
@@ -97,3 +97,12 @@ fi
 #if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
 #    . /etc/bash_completion
 #fi
+
+# prompt plugins
+[ -f ~/.kubectl_aliases.sh ] && . ~/.kubectl_aliases.sh
+[ -f ~/.kube-ps1.plugin.sh ] && . ~/.kube-ps1.plugin.sh
+[ -f ~/.git-prompt.sh ] && . ~/.git-prompt.sh
+
+# kube-ps1 prompt plugin configuration
+export KUBE_PS1_SYMBOL_ENABLE=false
+export KUBE_PS1_PREFIX=" ("
